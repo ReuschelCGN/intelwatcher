@@ -16,6 +16,52 @@ from intelwatcher.get_cookie import mechanize_cookie, selenium_cookie
 from intelwatcher.stopwatch import Stopwatch
 
 
+def get_bbox():
+    bboxes = []
+    areas_no = 0
+    loaded = []
+
+    if config.bbox:
+        bboxes = list(config.bbox.split(';'))
+        bbox_no = len(bboxes)
+        bboxes = [tuple(map(float, bbox.split(','))) for bbox in bboxes]
+        log.info(f"BBox loaded {bbox_no} areas")
+
+    if config.koji_project:
+        bboxes = []  # clean if we care about koji
+        session = requests.Session()
+        if config.koji_bearer:
+            session.headers = {'Authorization': "Bearer " + config.koji_bearer}
+        koji_req = session.get(config.koji_project)
+        koji_data = koji_req.json()
+
+        include_types = []
+        if config.koji_include:
+            if "," in config.koji_include:
+                include_types = config.koji_include.splitf(",")
+            else:
+                include_types = [config.koji_include]
+
+        for area in koji_data["data"]["features"]:
+            if include_types:
+                if area.get("properties") and area["properties"].get("type") in include_types:
+                    bbox = area.get("bbox")
+                    if bbox:
+                        areas_no += 1
+                        loaded.append(area.get("properties", {}).get("name", "No name"))
+                        bboxes.append(tuple(bbox))
+            else:
+                bbox = area.get("bbox")
+                if bbox:
+                    areas_no += 1
+                    loaded.append(area.get("properties", {}).get("name", "No name"))
+                    bboxes.append(tuple(bbox))
+
+        log.info(f"Koji loaded {areas_no} areas: {', '.join(loaded)}")
+
+    return list(set(bboxes))
+
+
 def update_wp(wp_type, points):
     updated = 0
     log.info(f"Found {len(points)} {wp_type}s")
@@ -48,13 +94,17 @@ def needed_tiles(tiles):
 
 
 def scrape_all(n):
-    bbox = list(config.bbox.split(';'))
     tiles = []
-    for cord in bbox:
-        bbox_cord = list(map(float, cord.split(',')))
-        tiles += get_tiles(bbox_cord)
 
-    log.info(f"Total tiles: {len(tiles)}")
+    bbox = get_bbox()
+    for cord in bbox:
+        tiles += get_tiles(cord)
+
+    # remove duplicated Tiles
+    all_tiles_no = len(tiles)
+    tiles = list(set(tiles))
+    dedupe_tiles_no = len(tiles)
+    log.info(f"Total tiles: {dedupe_tiles_no}. Removed {all_tiles_no - dedupe_tiles_no} duplicated tiles.")
 
     portals = []
     while len(needed_tiles(tiles)) > 0:
@@ -158,7 +208,7 @@ if __name__ == "__main__":
 
     config = Config(config_path)
 
-    scraper = IntelMap(config.cookie)
+    scraper = IntelMap(config.cookie, config)
 
     if not scraper.getCookieStatus():
         log.error("Oops! Looks like you have a problem with your cookie.")

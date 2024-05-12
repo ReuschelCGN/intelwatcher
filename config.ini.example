@@ -30,3 +30,17 @@ password =
 login_type = google/facebook
 driver = chrome/chromium/firefox
 headless_mode = True
+
+[proxy]
+host =
+port =
+username =
+password =
+
+[koji]
+# project URL eg: http://127.0.0.1:48080/api/v1/geofence/feature-collection/EnabledAreas
+project =
+# bearer token, or none if not used
+bearer =
+# filter on fence custom property `type`. if empty process all areas
+include_types =

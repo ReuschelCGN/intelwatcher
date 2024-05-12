@@ -112,8 +112,18 @@ def selenium_cookie(config, log):
     user_agent = ('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko)'
                   ' Chrome/122.0.6261.94 Safari/537.36')
 
+    profile = None
     if config.webdriver == 'firefox':
         options = webdriver.FirefoxOptions()
+        if config.proxy_host:
+            profile = webdriver.FirefoxProfile()
+            profile.set_preference('network.proxy.type', 1)
+            profile.set_preference('network.proxy.http', config.proxy_host)
+            profile.set_preference('network.proxy.http_port', config.proxy_port)
+            if config.proxy_username or config.proxy_password:
+                profile.set_preference('network.proxy.user', config.proxy_username)
+                profile.set_preference('network.proxy.password', config.proxy_password)
+            profile.update_preferences()
     else:
         options = webdriver.ChromeOptions()
         options.add_argument(f'user-agent={user_agent}')
@@ -127,7 +137,11 @@ def selenium_cookie(config, log):
         options.add_argument('--new-instance')
         options.add_argument('--safe-mode')
 
-        driver = webdriver.Firefox(executable_path=GeckoDriverManager().install(), options=options)
+        driver = webdriver.Firefox(
+            executable_path=GeckoDriverManager().install(),
+            options=options,
+            firefox_profile=profile
+        )
     else:
         options.add_argument('--disable-extensions')
         options.add_argument('--disable-dev-shm-usage')
